@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panorama Perspective Grid</title>
+<link rel="stylesheet" href="style.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.179.1/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.179.1/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<div id="ui">
+<h3>Panorama Grid</h3>
+<label><input type="checkbox" id="fog" checked> Воздушная перспектива</label><br>
+<label><input type="checkbox" id="horizon" checked> Горизонт</label><br>
+<p>ЛКМ: вращение обзора</p>
+</div>
+<div id="app"></div>
+<script type="module" src="main.js"></script>
+</body>
+</html>
