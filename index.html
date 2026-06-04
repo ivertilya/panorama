@@ -2,9 +2,8 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Panorama Perspective Grid</title>
-<link rel="stylesheet" href="style.css">
 <script type="importmap">
 {
   "imports": {
@@ -13,56 +12,698 @@
   }
 }
 </script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  overflow: hidden;
+  background: #fff;
+  font-family: 'DM Mono', monospace;
+  font-size: 12px;
+  touch-action: none;
+}
+
+#app { position: fixed; inset: 0; }
+
+/* ── Panel toggle button ── */
+#toggle-btn {
+  position: fixed;
+  top: 12px; right: 12px;
+  z-index: 200;
+  width: 38px; height: 38px;
+  border: 1.5px solid #222;
+  background: #fff;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  gap: 3px;
+  flex-direction: column;
+  padding: 8px 7px;
+  transition: background 0.15s;
+}
+#toggle-btn:hover { background: #f0f0f0; }
+#toggle-btn span {
+  display: block; width: 100%; height: 1.5px;
+  background: #222; border-radius: 1px;
+}
+
+/* ── Side panel ── */
+#panel {
+  position: fixed;
+  top: 0; right: 0;
+  width: 260px;
+  height: 100%;
+  background: #fff;
+  border-left: 1.5px solid #ddd;
+  z-index: 100;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(0);
+  transition: transform 0.25s cubic-bezier(.4,0,.2,1);
+  padding-bottom: 24px;
+}
+#panel.hidden { transform: translateX(100%); }
+
+.panel-head {
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid #eee;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: 10px;
+  color: #999;
+  font-weight: 500;
+}
+
+.section {
+  padding: 10px 16px;
+  border-bottom: 1px solid #eee;
+}
+.section-title {
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #bbb;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+/* row */
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 5px 0;
+  gap: 8px;
+}
+.row label { color: #444; white-space: nowrap; flex-shrink: 0; }
+
+/* checkbox */
+input[type=checkbox] {
+  appearance: none;
+  width: 16px; height: 16px;
+  border: 1.5px solid #ccc;
+  border-radius: 3px;
+  background: #fff;
+  cursor: pointer;
+  position: relative;
+  flex-shrink: 0;
+  transition: border-color 0.15s, background 0.15s;
+}
+input[type=checkbox]:checked { border-color: #222; background: #222; }
+input[type=checkbox]:checked::after {
+  content: '';
+  position: absolute;
+  left: 3px; top: 0px;
+  width: 5px; height: 9px;
+  border: 2px solid #fff;
+  border-top: none; border-left: none;
+  transform: rotate(45deg);
+}
+
+/* select */
+select {
+  border: 1.5px solid #ddd;
+  border-radius: 4px;
+  background: #fff;
+  color: #222;
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  padding: 3px 6px;
+  cursor: pointer;
+  width: 120px;
+  outline: none;
+}
+select:focus { border-color: #222; }
+
+/* range */
+.slider-wrap { margin: 4px 0; }
+.slider-top {
+  display: flex;
+  justify-content: space-between;
+  color: #444;
+  margin-bottom: 4px;
+}
+.slider-val { color: #222; font-weight: 500; }
+input[type=range] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 2px;
+  background: #ddd;
+  border-radius: 2px;
+  outline: none;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: #222;
+  cursor: pointer;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1.5px #222;
+}
+
+/* color */
+input[type=color] {
+  width: 36px; height: 22px;
+  border: 1.5px solid #ddd;
+  border-radius: 4px;
+  background: none;
+  cursor: pointer;
+  padding: 1px;
+}
+
+/* step rotation buttons */
+.step-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-rows: 1fr 1fr 1fr;
+  gap: 4px;
+  width: 100%;
+  max-width: 160px;
+  margin: 0 auto;
+}
+.step-btn {
+  border: 1.5px solid #ddd;
+  background: #fff;
+  border-radius: 5px;
+  height: 36px;
+  cursor: pointer;
+  font-size: 16px;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.1s, border-color 0.1s;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.step-btn:hover { background: #f5f5f5; border-color: #bbb; }
+.step-btn:active { background: #eee; }
+.step-btn.center-btn { grid-column: 2; grid-row: 2; font-size: 11px; color: #999; cursor: default; border-color: #eee; }
+
+/* offset buttons */
+.offset-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-rows: 1fr 1fr 1fr;
+  gap: 4px;
+  width: 100%;
+  max-width: 160px;
+  margin: 0 auto;
+}
+
+/* export */
+.export-fields { display: flex; flex-direction: column; gap: 6px; }
+.field-row { display: flex; align-items: center; gap: 6px; }
+.field-row label { color: #666; width: 60px; flex-shrink: 0; font-size: 11px; }
+.field-row input[type=number] {
+  width: 70px;
+  border: 1.5px solid #ddd;
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: #222;
+  outline: none;
+}
+.field-row input[type=number]:focus { border-color: #222; }
+.field-row select { width: 70px; font-size: 11px; }
+
+.export-btns { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.export-btn {
+  flex: 1;
+  border: 1.5px solid #222;
+  background: #fff;
+  color: #222;
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  padding: 7px 4px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.1s;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  min-width: 52px;
+  text-align: center;
+}
+.export-btn:hover { background: #f0f0f0; }
+.export-btn.svg-btn { border-color: #888; color: #888; }
+
+/* hint */
+.hint {
+  padding: 10px 16px 0;
+  color: #bbb;
+  font-size: 10px;
+  line-height: 1.7;
+  letter-spacing: 0.04em;
+}
+
+/* iPad-friendly touch targets */
+@media (pointer: coarse) {
+  .step-btn { height: 44px; }
+  input[type=range]::-webkit-slider-thumb { width: 20px; height: 20px; }
+  select, .export-btn { min-height: 36px; }
+}
+</style>
 </head>
 <body>
 
-<div id="ui">
-  <h3>Panorama Grid</h3>
+<div id="app"></div>
 
-  <div class="row">
-    <label>Проекция</label>
-    <select id="projection">
-      <option value="perspective">Перспектива</option>
-      <option value="equirect">Эквиректанг.</option>
-    </select>
-  </div>
+<button id="toggle-btn" title="Скрыть/показать панель">
+  <span></span><span></span><span></span>
+</button>
 
-  <div class="row">
-    <label>Атм. перспектива</label>
-    <input type="checkbox" id="fog" checked>
-  </div>
+<div id="panel">
+  <div class="panel-head">Panorama Grid</div>
 
-  <div class="row">
-    <label>Линия горизонта</label>
-    <input type="checkbox" id="horizon" checked>
-  </div>
-
-  <div class="slider-row">
-    <div class="slider-label">
-      <span>Шаг сетки</span>
-      <span><span id="density-val">40</span> ед.</span>
+  <!-- Проекция и FOV -->
+  <div class="section">
+    <div class="section-title">Проекция</div>
+    <div class="row">
+      <label>Тип</label>
+      <select id="projection">
+        <option value="perspective">Перспектива</option>
+        <option value="equirect">Эквиректанг.</option>
+      </select>
     </div>
-    <input type="range" id="density" min="10" max="150" value="40" step="5">
+    <div class="slider-wrap">
+      <div class="slider-top">
+        <span>Угол обзора (FOV)</span>
+        <span class="slider-val" id="fov-val">90°</span>
+      </div>
+      <input type="range" id="fov" min="10" max="170" value="90" step="1">
+    </div>
   </div>
 
-  <div class="row">
-    <label>Ближний цвет</label>
-    <input type="color" id="colorA" value="#00e5ff">
+  <!-- Сетка -->
+  <div class="section">
+    <div class="section-title">Сетка</div>
+    <div class="slider-wrap">
+      <div class="slider-top">
+        <span>Шаг</span>
+        <span class="slider-val" id="density-val">40</span>
+      </div>
+      <input type="range" id="density" min="10" max="150" value="40" step="5">
+    </div>
+    <div class="row" style="margin-top:6px">
+      <label>Атм. перспектива</label>
+      <input type="checkbox" id="fog" checked>
+    </div>
+    <div class="row">
+      <label>Ближний цвет</label>
+      <input type="color" id="colorA" value="#000000">
+    </div>
+    <div class="row">
+      <label>Дальний цвет</label>
+      <input type="color" id="colorB" value="#ffffff">
+    </div>
   </div>
 
-  <div class="row">
-    <label>Дальний цвет</label>
-    <input type="color" id="colorB" value="#0a0a12">
+  <!-- Сдвиг сетки -->
+  <div class="section">
+    <div class="section-title">Сдвиг центра на ½ шага</div>
+    <div class="offset-grid">
+      <div></div>
+      <button class="step-btn" id="off-up">↑</button>
+      <div></div>
+      <button class="step-btn" id="off-left">←</button>
+      <button class="step-btn center-btn" id="off-reset" title="Сбросить сдвиг">✕</button>
+      <button class="step-btn" id="off-right">→</button>
+      <div></div>
+      <button class="step-btn" id="off-down">↓</button>
+      <div></div>
+    </div>
+    <div style="text-align:center;color:#bbb;font-size:10px;margin-top:6px" id="offset-label">X:0 Y:0 Z:0</div>
+  </div>
+
+  <!-- Пошаговый поворот -->
+  <div class="section">
+    <div class="section-title">Поворот взгляда</div>
+    <div class="slider-wrap">
+      <div class="slider-top">
+        <span>Шаг</span>
+        <span class="slider-val" id="step-val">5°</span>
+      </div>
+      <input type="range" id="step-deg" min="1" max="45" value="5" step="1">
+    </div>
+    <div class="step-grid" style="margin-top:8px">
+      <div></div>
+      <button class="step-btn" id="look-up">↑</button>
+      <div></div>
+      <button class="step-btn" id="look-left">←</button>
+      <div class="step-btn center-btn">👁</div>
+      <button class="step-btn" id="look-right">→</button>
+      <div></div>
+      <button class="step-btn" id="look-down">↓</button>
+      <div></div>
+    </div>
+  </div>
+
+  <!-- Экспорт -->
+  <div class="section">
+    <div class="section-title">Экспорт</div>
+    <div class="export-fields">
+      <div class="field-row">
+        <label>Ширина</label>
+        <input type="number" id="exp-w" value="3508" min="1" max="20000">
+        <select id="exp-unit">
+          <option value="px">px</option>
+          <option value="mm">mm</option>
+          <option value="cm">cm</option>
+          <option value="in">in</option>
+        </select>
+      </div>
+      <div class="field-row">
+        <label>Высота</label>
+        <input type="number" id="exp-h" value="2480" min="1" max="20000">
+        <span style="font-size:11px;color:#aaa;width:70px;padding-left:6px">— авто</span>
+      </div>
+      <div class="field-row">
+        <label>DPI</label>
+        <input type="number" id="exp-dpi" value="300" min="72" max="1200">
+      </div>
+    </div>
+    <div class="export-btns">
+      <button class="export-btn" id="exp-png">PNG</button>
+      <button class="export-btn" id="exp-jpg">JPEG</button>
+      <button class="export-btn svg-btn" id="exp-svg">SVG</button>
+    </div>
   </div>
 
   <div class="hint">
-    ЛКМ + drag — вращение<br>
-    Сетка центрирована на камере<br>
+    ЛКМ / Тач — вращение<br>
     Шейдерная отрисовка · WebGL
   </div>
 </div>
 
-<div id="app"></div>
-<script type="module" src="main.js"></script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ── Scene ────────────────────────────────────────────────────────────────────
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xffffff);
+
+// ── Camera ───────────────────────────────────────────────────────────────────
+const camera = new THREE.PerspectiveCamera(90, innerWidth / innerHeight, 0.05, 8000);
+camera.position.set(0, 0, 0.01);
+
+// ── Renderer ─────────────────────────────────────────────────────────────────
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+document.getElementById('app').appendChild(renderer.domElement);
+
+// ── Controls ─────────────────────────────────────────────────────────────────
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enablePan  = false;
+controls.enableZoom = false;
+controls.rotateSpeed = 0.45;
+controls.target.set(0, 0, -1);
+controls.update();
+
+// ── State ─────────────────────────────────────────────────────────────────────
+const cfg = {
+  projection : 'perspective',
+  fog        : true,
+  density    : 40,
+  extent     : 1200,
+  colorA     : new THREE.Color(0x000000),
+  colorB     : new THREE.Color(0xffffff),
+  gridOffset : new THREE.Vector3(0, 0, 0), // in "half-steps"
+  fov        : 90,
+  stepDeg    : 5,
+};
+
+// ── Shader ───────────────────────────────────────────────────────────────────
+const lineMat = new THREE.ShaderMaterial({
+  vertexShader: /* glsl */`
+    uniform float uExtent;
+    uniform bool  uFog;
+    uniform vec3  uColorA;
+    uniform vec3  uColorB;
+    uniform bool  uEquirect;
+    varying vec4  vColor;
+
+    void main(){
+      vec3 pos = position;
+
+      if(uEquirect){
+        float r     = length(pos.xz);
+        float phi   = atan(pos.z, pos.x);
+        float theta = atan(pos.y, max(r, 0.001));
+        float R     = uExtent * 0.82;
+        pos = vec3(R*cos(theta)*cos(phi), R*sin(theta), R*cos(theta)*sin(phi));
+      }
+
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+
+      float dist  = length(position) / uExtent;
+      float alpha = uFog ? clamp(1.0 - dist * 0.9, 0.04, 1.0) : 0.85;
+      vec3  col   = uFog ? mix(uColorA, uColorB, smoothstep(0.0, 1.0, dist)) : uColorA;
+
+      vColor = vec4(col, alpha);
+    }
+  `,
+  fragmentShader: /* glsl */`
+    varying vec4 vColor;
+    void main(){ gl_FragColor = vColor; }
+  `,
+  uniforms: {
+    uExtent  : { value: cfg.extent },
+    uFog     : { value: cfg.fog },
+    uColorA  : { value: cfg.colorA.clone() },
+    uColorB  : { value: cfg.colorB.clone() },
+    uEquirect: { value: false },
+  },
+  transparent: true,
+  depthWrite : false,
+  blending   : THREE.NormalBlending,
+});
+
+// ── Grid mesh ─────────────────────────────────────────────────────────────────
+let linesMesh = null;
+
+function buildGrid() {
+  const { density, extent } = cfg;
+  const positions = [];
+  const steps = Math.ceil(extent / density);
+
+  const add = (ax,ay,az, bx,by,bz) => positions.push(ax,ay,az, bx,by,bz);
+
+  for (let yi = -steps; yi <= steps; yi++) {
+    const y = yi * density;
+    for (let zi = -steps; zi <= steps; zi++) add(-extent, y, zi*density, extent, y, zi*density);
+    for (let xi = -steps; xi <= steps; xi++) add(xi*density, y, -extent, xi*density, y, extent);
+  }
+  for (let xi = -steps; xi <= steps; xi++)
+    for (let zi = -steps; zi <= steps; zi++)
+      add(xi*density, -extent, zi*density, xi*density, extent, zi*density);
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+
+  if (linesMesh) {
+    linesMesh.geometry.dispose();
+    linesMesh.geometry = geo;
+  } else {
+    linesMesh = new THREE.LineSegments(geo, lineMat);
+    linesMesh.frustumCulled = false;
+    scene.add(linesMesh);
+  }
+  lineMat.uniforms.uExtent.value = extent;
+}
+buildGrid();
+
+function syncUniforms() {
+  lineMat.uniforms.uFog.value      = cfg.fog;
+  lineMat.uniforms.uEquirect.value = cfg.projection === 'equirect';
+  lineMat.uniforms.uColorA.value.set(cfg.colorA);
+  lineMat.uniforms.uColorB.value.set(cfg.colorB);
+}
+
+// ── Animate ───────────────────────────────────────────────────────────────────
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+
+  if (linesMesh) {
+    const snap = cfg.density;
+    linesMesh.position.set(
+      Math.round(camera.position.x / snap) * snap + cfg.gridOffset.x,
+      Math.round(camera.position.y / snap) * snap + cfg.gridOffset.y,
+      Math.round(camera.position.z / snap) * snap + cfg.gridOffset.z,
+    );
+  }
+
+  renderer.render(scene, camera);
+}
+animate();
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// ── Step rotation ─────────────────────────────────────────────────────────────
+function stepRotate(dAzimuth, dElevation) {
+  // Work with spherical coords relative to camera position
+  const dir = new THREE.Vector3();
+  dir.subVectors(controls.target, camera.position).normalize();
+
+  const spherical = new THREE.Spherical().setFromVector3(dir);
+  spherical.theta += THREE.MathUtils.degToRad(dAzimuth);
+  spherical.phi   -= THREE.MathUtils.degToRad(dElevation);
+  spherical.phi    = THREE.MathUtils.clamp(spherical.phi, 0.05, Math.PI - 0.05);
+
+  const newDir = new THREE.Vector3().setFromSpherical(spherical);
+  controls.target.copy(camera.position).addScaledVector(newDir, 1);
+  controls.update();
+}
+
+// ── UI helpers ────────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+
+$('toggle-btn').addEventListener('click', () => {
+  $('panel').classList.toggle('hidden');
+});
+
+$('fog').addEventListener('change', e => { cfg.fog = e.target.checked; syncUniforms(); });
+
+$('projection').addEventListener('change', e => { cfg.projection = e.target.value; syncUniforms(); });
+
+$('fov').addEventListener('input', e => {
+  cfg.fov = +e.target.value;
+  $('fov-val').textContent = cfg.fov + '°';
+  camera.fov = cfg.fov;
+  camera.updateProjectionMatrix();
+});
+
+$('density').addEventListener('input', e => {
+  cfg.density = +e.target.value;
+  $('density-val').textContent = cfg.density;
+  buildGrid();
+});
+
+$('colorA').addEventListener('input', e => { cfg.colorA.set(e.target.value); syncUniforms(); });
+$('colorB').addEventListener('input', e => { cfg.colorB.set(e.target.value); syncUniforms(); });
+
+$('step-deg').addEventListener('input', e => {
+  cfg.stepDeg = +e.target.value;
+  $('step-val').textContent = cfg.stepDeg + '°';
+});
+
+$('look-up').addEventListener('click',    () => stepRotate(0,  cfg.stepDeg));
+$('look-down').addEventListener('click',  () => stepRotate(0, -cfg.stepDeg));
+$('look-left').addEventListener('click',  () => stepRotate(-cfg.stepDeg, 0));
+$('look-right').addEventListener('click', () => stepRotate( cfg.stepDeg, 0));
+
+// Grid offset (half-step shifts)
+function updateOffsetLabel() {
+  const o = cfg.gridOffset;
+  $('offset-label').textContent = `X:${o.x} Y:${o.y} Z:${o.z}`;
+}
+function shiftOffset(axis, sign) {
+  cfg.gridOffset[axis] += sign * cfg.density * 0.5;
+  updateOffsetLabel();
+}
+$('off-up').addEventListener('click',    () => shiftOffset('y',  1));
+$('off-down').addEventListener('click',  () => shiftOffset('y', -1));
+$('off-left').addEventListener('click',  () => shiftOffset('x', -1));
+$('off-right').addEventListener('click', () => shiftOffset('x',  1));
+$('off-reset').addEventListener('click', () => {
+  cfg.gridOffset.set(0,0,0);
+  updateOffsetLabel();
+});
+
+// ── Export ────────────────────────────────────────────────────────────────────
+function unitToPx(val, unit, dpi) {
+  switch(unit) {
+    case 'mm': return Math.round(val / 25.4 * dpi);
+    case 'cm': return Math.round(val / 2.54 * dpi);
+    case 'in': return Math.round(val * dpi);
+    default:   return Math.round(val);
+  }
+}
+
+function renderOffscreen(wPx, hPx) {
+  // Render at desired pixel size into an offscreen canvas
+  const offRenderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+  offRenderer.setPixelRatio(1);
+  offRenderer.setSize(wPx, hPx);
+  offRenderer.setClearColor(0xffffff, 1);
+
+  const offCam = camera.clone();
+  offCam.aspect = wPx / hPx;
+  offCam.updateProjectionMatrix();
+
+  if (linesMesh) {
+    // keep same grid position
+    const savedPos = linesMesh.position.clone();
+    offRenderer.render(scene, offCam);
+  } else {
+    offRenderer.render(scene, offCam);
+  }
+
+  const dataURL = offRenderer.domElement.toDataURL;
+  const canvas  = offRenderer.domElement;
+  offRenderer.dispose();
+  return canvas;
+}
+
+function doExport(format) {
+  const unit = $('exp-unit').value;
+  const dpi  = +$('exp-dpi').value || 300;
+  const wRaw = +$('exp-w').value   || 3508;
+  const hRaw = +$('exp-h').value   || 2480;
+  const wPx  = unitToPx(wRaw, unit, dpi);
+  const hPx  = unitToPx(hRaw, unit, dpi);
+
+  if (format === 'svg') {
+    exportSVG(wPx, hPx, wRaw, hRaw, unit, dpi);
+    return;
+  }
+
+  const canvas = renderOffscreen(wPx, hPx);
+  const mime   = format === 'jpg' ? 'image/jpeg' : 'image/png';
+  const ext    = format === 'jpg' ? 'jpg' : 'png';
+  const url    = canvas.toDataURL(mime, 0.95);
+  const a      = document.createElement('a');
+  a.href       = url;
+  a.download   = `grid_${wPx}x${hPx}.${ext}`;
+  a.click();
+}
+
+function exportSVG(wPx, hPx, wRaw, hRaw, unit, dpi) {
+  // Render to canvas then embed as image in SVG with correct physical dimensions
+  const canvas = renderOffscreen(wPx, hPx);
+  const imgData = canvas.toDataURL('image/png');
+
+  const svgW = unit === 'px' ? wPx + 'px' : (wRaw + unit);
+  const svgH = unit === 'px' ? hPx + 'px' : (hRaw + unit);
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     xmlns:xlink="http://www.w3.org/1999/xlink"
+     width="${svgW}" height="${svgH}"
+     viewBox="0 0 ${wPx} ${hPx}">
+  <image xlink:href="${imgData}" x="0" y="0" width="${wPx}" height="${hPx}"/>
+</svg>`;
+  const blob = new Blob([svg], { type: 'image/svg+xml' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `grid_${wPx}x${hPx}.svg`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+$('exp-png').addEventListener('click', () => doExport('png'));
+$('exp-jpg').addEventListener('click', () => doExport('jpg'));
+$('exp-svg').addEventListener('click', () => doExport('svg'));
+</script>
 </body>
 </html>
