@@ -15,12 +15,53 @@
 </script>
 </head>
 <body>
+
 <div id="ui">
-<h3>Panorama Grid</h3>
-<label><input type="checkbox" id="fog" checked> Воздушная перспектива</label><br>
-<label><input type="checkbox" id="horizon" checked> Горизонт</label><br>
-<p>ЛКМ: вращение обзора</p>
+  <h3>Panorama Grid</h3>
+
+  <div class="row">
+    <label>Проекция</label>
+    <select id="projection">
+      <option value="perspective">Перспектива</option>
+      <option value="equirect">Эквиректанг.</option>
+    </select>
+  </div>
+
+  <div class="row">
+    <label>Атм. перспектива</label>
+    <input type="checkbox" id="fog" checked>
+  </div>
+
+  <div class="row">
+    <label>Линия горизонта</label>
+    <input type="checkbox" id="horizon" checked>
+  </div>
+
+  <div class="slider-row">
+    <div class="slider-label">
+      <span>Шаг сетки</span>
+      <span><span id="density-val">40</span> ед.</span>
+    </div>
+    <input type="range" id="density" min="10" max="150" value="40" step="5">
+  </div>
+
+  <div class="row">
+    <label>Ближний цвет</label>
+    <input type="color" id="colorA" value="#00e5ff">
+  </div>
+
+  <div class="row">
+    <label>Дальний цвет</label>
+    <input type="color" id="colorB" value="#0a0a12">
+  </div>
+
+  <div class="hint">
+    ЛКМ + drag — вращение<br>
+    Сетка центрирована на камере<br>
+    Шейдерная отрисовка · WebGL
+  </div>
 </div>
+
 <div id="app"></div>
 <script type="module" src="main.js"></script>
 </body>
