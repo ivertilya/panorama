@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
@@ -312,72 +312,72 @@ input[type=color] {
   <img id="bg-image" style="display:none;position:absolute;top:50%;left:50%;pointer-events:none;user-select:none;-webkit-user-select:none;will-change:transform;">
 </div>
 
-<button id="toggle-btn" title="Скрыть/показать панель">
+<button id="toggle-btn" title="Show/hide panel">
   <span></span><span></span><span></span>
 </button>
 
 <div id="panel">
   <div class="panel-head">Panorama Grid</div>
 
-  <!-- Проекция и FOV -->
+  <!-- Projection & FOV -->
   <div class="section">
-    <div class="section-title">Проекция</div>
+    <div class="section-title">Projection</div>
     <div class="row">
-      <label>Тип</label>
+      <label>Type</label>
       <select id="projection">
-        <option value="perspective">Перспектива</option>
-        <option value="equirect">Эквиректанг.</option>
+        <option value="perspective">Perspective</option>
+        <option value="equirect">Equirectangular</option>
       </select>
     </div>
     <div class="slider-wrap">
       <div class="slider-top">
-        <span>Угол обзора (FOV)</span>
+        <span>Field of view (FOV)</span>
         <span class="slider-val" id="fov-val">90°</span>
       </div>
       <input type="range" id="fov" min="10" max="170" value="90" step="1">
     </div>
   </div>
 
-  <!-- Сетка -->
+  <!-- Grid -->
   <div class="section">
-    <div class="section-title">Сетка</div>
+    <div class="section-title">Grid</div>
     <div class="slider-wrap">
       <div class="slider-top">
-        <span>Шаг</span>
+        <span>Step</span>
         <span class="slider-val" id="density-val">40</span>
       </div>
       <input type="range" id="density" min="10" max="150" value="40" step="5">
     </div>
     <div class="row" style="margin-top:6px">
-      <label>Атм. перспектива</label>
+      <label>Aerial perspective</label>
       <input type="checkbox" id="fog" checked>
     </div>
     <div class="row">
-      <label>Ближний цвет</label>
+      <label>Near color</label>
       <input type="color" id="colorA" value="#000000">
     </div>
     <div class="row">
-      <label>Дальний цвет</label>
+      <label>Far color</label>
       <input type="color" id="colorB" value="#ffffff">
     </div>
     <div class="slider-wrap" style="margin-top:6px">
       <div class="slider-top">
-        <span>Толщина линий</span>
+        <span>Line thickness</span>
         <span class="slider-val" id="lw-val">1</span>
       </div>
       <input type="range" id="line-width" min="1" max="5" value="1" step="0.5">
     </div>
   </div>
 
-  <!-- Сдвиг сетки -->
+  <!-- Grid offset -->
   <div class="section">
-    <div class="section-title">Сдвиг центра на ½ шага</div>
+    <div class="section-title">Shift center by ½ step</div>
     <div class="offset-grid">
       <div></div>
       <button class="step-btn" id="off-up">↑</button>
       <div></div>
       <button class="step-btn" id="off-left">←</button>
-      <button class="step-btn center-btn" id="off-reset" title="Сбросить сдвиг">✕</button>
+      <button class="step-btn center-btn" id="off-reset" title="Reset shift">✕</button>
       <button class="step-btn" id="off-right">→</button>
       <div></div>
       <button class="step-btn" id="off-down">↓</button>
@@ -386,12 +386,12 @@ input[type=color] {
     <div style="text-align:center;color:#bbb;font-size:10px;margin-top:6px" id="offset-label">X:0 Y:0 Z:0</div>
   </div>
 
-  <!-- Пошаговый поворот -->
+  <!-- Step rotation -->
   <div class="section">
-    <div class="section-title">Поворот взгляда</div>
+    <div class="section-title">View rotation</div>
     <div class="slider-wrap">
       <div class="slider-top">
-        <span>Шаг</span>
+        <span>Step</span>
         <span class="slider-val" id="step-val">5°</span>
       </div>
       <input type="range" id="step-deg" min="1" max="45" value="5" step="1">
@@ -401,7 +401,7 @@ input[type=color] {
       <button class="step-btn" id="look-up">↑</button>
       <div></div>
       <button class="step-btn" id="look-left">←</button>
-      <button class="step-btn center-btn" id="look-reset" title="Сбросить вид">👁</button>
+      <button class="step-btn center-btn" id="look-reset" title="Reset view">👁</button>
       <button class="step-btn" id="look-right">→</button>
       <div></div>
       <button class="step-btn" id="look-down">↓</button>
@@ -409,21 +409,21 @@ input[type=color] {
     </div>
   </div>
 
-  <!-- Импорт изображения -->
+  <!-- Image import -->
   <div class="section">
-    <div class="section-title">Фон для калибровки</div>
-    <div class="file-drop" id="file-drop">📁 Загрузить изображение</div>
+    <div class="section-title">Calibration background</div>
+    <div class="file-drop" id="file-drop">📁 Upload image</div>
     <input type="file" id="img-file-input" accept="image/*">
 
     <div class="img-controls" id="img-controls">
       <div class="row" style="margin-top:8px">
-        <label>Показать</label>
+        <label>Show</label>
         <input type="checkbox" id="img-visible" checked>
       </div>
 
       <div class="slider-wrap">
         <div class="slider-top">
-          <span>Прозрачность сетки</span>
+          <span>Grid opacity</span>
           <span class="slider-val" id="img-opacity-val">50%</span>
         </div>
         <input type="range" id="img-opacity" min="0" max="100" value="50" step="1">
@@ -431,7 +431,7 @@ input[type=color] {
 
       <div class="slider-wrap">
         <div class="slider-top">
-          <span>Масштаб</span>
+          <span>Scale</span>
           <span class="slider-val" id="img-scale-val">100%</span>
         </div>
         <input type="range" id="img-scale" min="20" max="300" value="100" step="1">
@@ -439,7 +439,7 @@ input[type=color] {
 
       <div class="slider-wrap">
         <div class="slider-top">
-          <span>Сдвиг X</span>
+          <span>Shift X</span>
           <span class="slider-val" id="img-x-val">0</span>
         </div>
         <input type="range" id="img-x" min="-100" max="100" value="0" step="1">
@@ -447,25 +447,25 @@ input[type=color] {
 
       <div class="slider-wrap">
         <div class="slider-top">
-          <span>Сдвиг Y</span>
+          <span>Shift Y</span>
           <span class="slider-val" id="img-y-val">0</span>
         </div>
         <input type="range" id="img-y" min="-100" max="100" value="0" step="1">
       </div>
 
       <div class="btn-row">
-        <button class="mini-btn primary" id="img-autofit" title="Подгонка FOV и масштаба по пропорциям фото">⌖ Авто-подгон</button>
-        <button class="mini-btn danger" id="img-remove">✕ Убрать</button>
+        <button class="mini-btn primary" id="img-autofit" title="Fit scale to image proportions">⌖ Auto-fit</button>
+        <button class="mini-btn danger" id="img-remove">✕ Remove</button>
       </div>
     </div>
   </div>
 
-  <!-- Экспорт -->
+  <!-- Export -->
   <div class="section">
-    <div class="section-title">Экспорт</div>
+    <div class="section-title">Export</div>
     <div class="export-fields">
       <div class="field-row">
-        <label>Ширина</label>
+        <label>Width</label>
         <input type="number" id="exp-w" value="3508" min="1" max="20000">
         <select id="exp-unit">
           <option value="px">px</option>
@@ -475,9 +475,9 @@ input[type=color] {
         </select>
       </div>
       <div class="field-row">
-        <label>Высота</label>
+        <label>Height</label>
         <input type="number" id="exp-h" value="2480" min="1" max="20000">
-        <span style="font-size:11px;color:#aaa;width:70px;padding-left:6px">— авто</span>
+        <span style="font-size:11px;color:#aaa;width:70px;padding-left:6px">— auto</span>
       </div>
       <div class="field-row">
         <label>DPI</label>
@@ -492,8 +492,8 @@ input[type=color] {
   </div>
 
   <div class="hint">
-    ЛКМ / Тач — вращение<br>
-    Шейдерная отрисовка · WebGL
+    LMB / Touch — rotate view<br>
+    Shader-based rendering · WebGL
   </div>
 </div>
 
@@ -780,7 +780,7 @@ $('img-remove').addEventListener('click', () => {
   bgImg.style.display = 'none';
   bgImg.src = '';
   fileDrop.classList.remove('has-image');
-  fileDrop.textContent = '📁 Загрузить изображение';
+  fileDrop.textContent = '📁 Upload image';
   imgControls.classList.remove('active');
   fileInput.value = '';
   applyGridOpacity();
