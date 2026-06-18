@@ -25,7 +25,9 @@ body {
   touch-action: none;
 }
 
-#app { position: fixed; inset: 0; }
+#app { position: fixed; inset: 0; overflow: hidden; }
+#bg-image { z-index: 1; max-width: none; }
+#app canvas { position: relative; z-index: 2; }
 
 /* ── Panel toggle button ── */
 #toggle-btn {
@@ -201,7 +203,8 @@ input[type=color] {
 }
 .step-btn:hover { background: #f5f5f5; border-color: #bbb; }
 .step-btn:active { background: #eee; }
-.step-btn.center-btn { grid-column: 2; grid-row: 2; font-size: 11px; color: #999; cursor: default; border-color: #eee; }
+.step-btn.center-btn { grid-column: 2; grid-row: 2; font-size: 13px; color: #555; border-color: #ccc; }
+.step-btn.center-btn:hover { background: #f5f5f5; border-color: #999; }
 
 /* offset buttons */
 .offset-grid {
@@ -251,6 +254,41 @@ input[type=color] {
 .export-btn:hover { background: #f0f0f0; }
 .export-btn.svg-btn { border-color: #888; color: #888; }
 
+/* image import */
+.file-drop {
+  border: 1.5px dashed #ccc;
+  border-radius: 6px;
+  padding: 14px 10px;
+  text-align: center;
+  color: #999;
+  font-size: 11px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.file-drop:hover { border-color: #888; background: #fafafa; }
+.file-drop.has-image { border-color: #222; color: #222; }
+#img-file-input { display: none; }
+
+.img-controls { margin-top: 8px; display: none; }
+.img-controls.active { display: block; }
+
+.btn-row { display: flex; gap: 6px; margin-top: 8px; }
+.mini-btn {
+  flex: 1;
+  border: 1.5px solid #ddd;
+  background: #fff;
+  color: #444;
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  padding: 6px 4px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.mini-btn:hover { background: #f5f5f5; }
+.mini-btn.primary { border-color: #222; color: #222; font-weight: 500; }
+.mini-btn.danger { color: #c0392b; border-color: #e8b4ac; }
+
 /* hint */
 .hint {
   padding: 10px 16px 0;
@@ -270,7 +308,9 @@ input[type=color] {
 </head>
 <body>
 
-<div id="app"></div>
+<div id="app">
+  <img id="bg-image" style="display:none;position:absolute;top:50%;left:50%;pointer-events:none;user-select:none;-webkit-user-select:none;will-change:transform;">
+</div>
 
 <button id="toggle-btn" title="Скрыть/показать панель">
   <span></span><span></span><span></span>
@@ -369,6 +409,57 @@ input[type=color] {
     </div>
   </div>
 
+  <!-- Импорт изображения -->
+  <div class="section">
+    <div class="section-title">Фон для калибровки</div>
+    <div class="file-drop" id="file-drop">📁 Загрузить изображение</div>
+    <input type="file" id="img-file-input" accept="image/*">
+
+    <div class="img-controls" id="img-controls">
+      <div class="row" style="margin-top:8px">
+        <label>Показать</label>
+        <input type="checkbox" id="img-visible" checked>
+      </div>
+
+      <div class="slider-wrap">
+        <div class="slider-top">
+          <span>Прозрачность сетки</span>
+          <span class="slider-val" id="img-opacity-val">50%</span>
+        </div>
+        <input type="range" id="img-opacity" min="0" max="100" value="50" step="1">
+      </div>
+
+      <div class="slider-wrap">
+        <div class="slider-top">
+          <span>Масштаб</span>
+          <span class="slider-val" id="img-scale-val">100%</span>
+        </div>
+        <input type="range" id="img-scale" min="20" max="300" value="100" step="1">
+      </div>
+
+      <div class="slider-wrap">
+        <div class="slider-top">
+          <span>Сдвиг X</span>
+          <span class="slider-val" id="img-x-val">0</span>
+        </div>
+        <input type="range" id="img-x" min="-100" max="100" value="0" step="1">
+      </div>
+
+      <div class="slider-wrap">
+        <div class="slider-top">
+          <span>Сдвиг Y</span>
+          <span class="slider-val" id="img-y-val">0</span>
+        </div>
+        <input type="range" id="img-y" min="-100" max="100" value="0" step="1">
+      </div>
+
+      <div class="btn-row">
+        <button class="mini-btn primary" id="img-autofit" title="Подгонка FOV и масштаба по пропорциям фото">⌖ Авто-подгон</button>
+        <button class="mini-btn danger" id="img-remove">✕ Убрать</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Экспорт -->
   <div class="section">
     <div class="section-title">Экспорт</div>
@@ -419,7 +510,8 @@ const camera = new THREE.PerspectiveCamera(90, innerWidth / innerHeight, 0.05, 8
 camera.position.set(0, 0, 0.01);
 
 // ── Renderer ─────────────────────────────────────────────────────────────────
-const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, alpha: true });
+renderer.setClearColor(0xffffff, 1);
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 document.getElementById('app').appendChild(renderer.domElement);
@@ -444,6 +536,17 @@ const cfg = {
   fov        : 90,
   stepDeg    : 5,
   lineWidth  : 1,
+};
+
+const imgState = {
+  loaded   : false,
+  opacity  : 0.5,   // grid opacity over image (we dim the grid, not the image)
+  scale    : 1.0,
+  offsetX  : 0,     // percent of viewport width
+  offsetY  : 0,
+  visible  : true,
+  naturalW : 0,
+  naturalH : 0,
 };
 
 // ── Shader ───────────────────────────────────────────────────────────────────
@@ -536,6 +639,10 @@ function syncUniforms() {
   lineMat.uniforms.uColorB.value.set(cfg.colorB);
 }
 
+function applyGridOpacity() {
+  renderer.domElement.style.opacity = imgState.loaded ? (1 - imgState.opacity) : 1;
+}
+
 // ── Animate ───────────────────────────────────────────────────────────────────
 function animate() {
   requestAnimationFrame(animate);
@@ -575,6 +682,144 @@ function stepRotate(dAzimuth, dElevation) {
   controls.target.copy(camera.position).addScaledVector(newDir, 1);
   controls.update();
 }
+
+// ── Background image (for grid calibration) ──────────────────────────────────
+const bgImg     = $('bg-image');
+const fileDrop   = $('file-drop');
+const fileInput  = $('img-file-input');
+const imgControls = $('img-controls');
+
+function updateImgTransform() {
+  const vw = innerWidth, vh = innerHeight;
+  bgImg.style.transform =
+    `translate(-50%, -50%) translate(${imgState.offsetX/100*vw}px, ${imgState.offsetY/100*vh}px) scale(${imgState.scale})`;
+}
+
+function loadImageFile(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    bgImg.onload = () => {
+      imgState.loaded   = true;
+      imgState.naturalW = bgImg.naturalWidth;
+      imgState.naturalH = bgImg.naturalHeight;
+      imgState.scale    = 1;
+      imgState.offsetX  = 0;
+      imgState.offsetY  = 0;
+
+      // fit image to viewport height by default
+      const scaleToFitH = innerHeight / bgImg.naturalHeight;
+      const scaleToFitW = innerWidth  / bgImg.naturalWidth;
+      const fitScale = Math.min(scaleToFitH, scaleToFitW) * 1.0;
+      bgImg.style.width  = bgImg.naturalWidth + 'px';
+      bgImg.style.height = bgImg.naturalHeight + 'px';
+
+      imgState.scale = fitScale;
+      $('img-scale').value = Math.round(fitScale * 100);
+      $('img-scale-val').textContent = Math.round(fitScale * 100) + '%';
+
+      updateImgTransform();
+      bgImg.style.display = 'block';
+
+      fileDrop.classList.add('has-image');
+      fileDrop.textContent = '✓ ' + file.name;
+      imgControls.classList.add('active');
+
+      applyGridOpacity();
+    };
+    bgImg.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+fileDrop.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', e => loadImageFile(e.target.files[0]));
+
+// drag & drop
+fileDrop.addEventListener('dragover', e => { e.preventDefault(); fileDrop.style.background = '#f0f0f0'; });
+fileDrop.addEventListener('dragleave', () => { fileDrop.style.background = ''; });
+fileDrop.addEventListener('drop', e => {
+  e.preventDefault();
+  fileDrop.style.background = '';
+  loadImageFile(e.dataTransfer.files[0]);
+});
+
+$('img-visible').addEventListener('change', e => {
+  imgState.visible = e.target.checked;
+  bgImg.style.display = (imgState.loaded && imgState.visible) ? 'block' : 'none';
+});
+
+$('img-opacity').addEventListener('input', e => {
+  imgState.opacity = (+e.target.value) / 100;
+  $('img-opacity-val').textContent = e.target.value + '%';
+  applyGridOpacity();
+});
+
+$('img-scale').addEventListener('input', e => {
+  imgState.scale = (+e.target.value) / 100;
+  $('img-scale-val').textContent = e.target.value + '%';
+  updateImgTransform();
+});
+
+$('img-x').addEventListener('input', e => {
+  imgState.offsetX = +e.target.value;
+  $('img-x-val').textContent = e.target.value;
+  updateImgTransform();
+});
+
+$('img-y').addEventListener('input', e => {
+  imgState.offsetY = +e.target.value;
+  $('img-y-val').textContent = e.target.value;
+  updateImgTransform();
+});
+
+$('img-remove').addEventListener('click', () => {
+  imgState.loaded = false;
+  bgImg.style.display = 'none';
+  bgImg.src = '';
+  fileDrop.classList.remove('has-image');
+  fileDrop.textContent = '📁 Загрузить изображение';
+  imgControls.classList.remove('active');
+  fileInput.value = '';
+  applyGridOpacity();
+});
+
+// Auto-fit: estimate camera FOV from image aspect ratio + viewport,
+// and scale image to match viewport exactly (removes manual guesswork
+// for the most common case: photo taken on a similar-FOV lens).
+$('img-autofit').addEventListener('click', () => {
+  if (!imgState.loaded) return;
+
+  const imgAspect = imgState.naturalW / imgState.naturalH;
+  const vpAspect  = innerWidth / innerHeight;
+
+  // Match vertical FOV so the image's vertical angular coverage lines up
+  // with the grid's vertical lines, assuming image was shot with a
+  // "normal" lens matched to the current FOV slider as a starting guess.
+  // We scale the image so its full height/width maps edge-to-edge,
+  // then adjust camera aspect handling implicitly via CSS object-fit logic.
+  let fitScale;
+  if (imgAspect > vpAspect) {
+    // image wider than viewport -> fit by height
+    fitScale = innerHeight / imgState.naturalH;
+  } else {
+    // image taller than viewport -> fit by width
+    fitScale = innerWidth / imgState.naturalW;
+  }
+
+  imgState.scale   = fitScale;
+  imgState.offsetX = 0;
+  imgState.offsetY = 0;
+
+  $('img-scale').value = Math.round(fitScale * 100);
+  $('img-scale-val').textContent = Math.round(fitScale * 100) + '%';
+  $('img-x').value = 0; $('img-x-val').textContent = '0';
+  $('img-y').value = 0; $('img-y-val').textContent = '0';
+
+  updateImgTransform();
+});
+
+addEventListener('resize', () => { if (imgState.loaded) updateImgTransform(); });
 
 // ── UI helpers ────────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
@@ -657,28 +902,43 @@ function unitToPx(val, unit, dpi) {
 }
 
 function renderOffscreen(wPx, hPx) {
-  // Render at desired pixel size into an offscreen canvas
-  const offRenderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+  // Render the grid at desired pixel size
+  const offRenderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, alpha: true });
   offRenderer.setPixelRatio(1);
   offRenderer.setSize(wPx, hPx);
-  offRenderer.setClearColor(0xffffff, 1);
+  offRenderer.setClearColor(0xffffff, imgState.loaded ? 0 : 1);
 
   const offCam = camera.clone();
   offCam.aspect = wPx / hPx;
   offCam.updateProjectionMatrix();
 
-  if (linesMesh) {
-    // keep same grid position
-    const savedPos = linesMesh.position.clone();
-    offRenderer.render(scene, offCam);
-  } else {
-    offRenderer.render(scene, offCam);
+  offRenderer.render(scene, offCam);
+  const gridCanvas = offRenderer.domElement;
+
+  // Compose final canvas: white bg -> image (if any) -> grid (with opacity)
+  const out = document.createElement('canvas');
+  out.width = wPx; out.height = hPx;
+  const ctx = out.getContext('2d');
+
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, wPx, hPx);
+
+  if (imgState.loaded && imgState.visible) {
+    // Map the on-screen image transform (viewport-relative) to export resolution
+    const scaleRatio = wPx / innerWidth;
+    const drawW = imgState.naturalW * imgState.scale * scaleRatio;
+    const drawH = imgState.naturalH * imgState.scale * scaleRatio;
+    const cx = wPx / 2 + (imgState.offsetX / 100) * wPx;
+    const cy = hPx / 2 + (imgState.offsetY / 100) * hPx;
+    ctx.drawImage(bgImg, cx - drawW / 2, cy - drawH / 2, drawW, drawH);
   }
 
-  const dataURL = offRenderer.domElement.toDataURL;
-  const canvas  = offRenderer.domElement;
+  ctx.globalAlpha = imgState.loaded ? (1 - imgState.opacity) : 1;
+  ctx.drawImage(gridCanvas, 0, 0, wPx, hPx);
+  ctx.globalAlpha = 1;
+
   offRenderer.dispose();
-  return canvas;
+  return out;
 }
 
 function doExport(format) {
