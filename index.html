@@ -489,6 +489,20 @@ input[type=color] {
       <button class="export-btn" id="exp-jpg">JPEG</button>
       <button class="export-btn svg-btn" id="exp-svg">SVG</button>
     </div>
+    <div class="row" style="margin-top:8px">
+      <label>Transparent bg (PNG)</label>
+      <input type="checkbox" id="exp-transparent">
+    </div>
+    <div style="border-top:1px solid #eee;margin-top:10px;padding-top:10px">
+      <div class="section-title" style="margin-bottom:6px">360° Panorama</div>
+      <div class="field-row" style="margin-bottom:6px">
+        <label>Width</label>
+        <input type="number" id="exp360-w" value="4096" min="512" max="16384">
+        <span style="font-size:10px;color:#aaa;padding-left:4px">px</span>
+      </div>
+      <button class="export-btn" id="exp-360" style="width:100%">Export 360° PNG</button>
+      <div style="font-size:9px;color:#bbb;margin-top:5px;line-height:1.5">Equirectangular · 2:1 ratio<br>Ready for VR / Photoshop 3D</div>
+    </div>
   </div>
 
   <div class="hint">
@@ -902,30 +916,32 @@ function unitToPx(val, unit, dpi) {
   }
 }
 
-function renderOffscreen(wPx, hPx) {
-  // Render the grid at desired pixel size
+function renderOffscreen(wPx, hPx, transparent = false) {
   const offRenderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, alpha: true });
   offRenderer.setPixelRatio(1);
   offRenderer.setSize(wPx, hPx);
-  offRenderer.setClearColor(0xffffff, imgState.loaded ? 0 : 1);
-
-  const offCam = camera.clone();
-  offCam.aspect = wPx / hPx;
-  offCam.updateProjectionMatrix();
-
-  offRenderer.render(scene, offCam);
+  offRenderer.setClearColor(0xffffff, 0); // always clear to transparent
+  offRenderer.render(scene, (() => {
+    const c = camera.clone();
+    c.aspect = wPx / hPx;
+    c.updateProjectionMatrix();
+    return c;
+  })());
   const gridCanvas = offRenderer.domElement;
 
-  // Compose final canvas: white bg -> image (if any) -> grid (with opacity)
   const out = document.createElement('canvas');
   out.width = wPx; out.height = hPx;
   const ctx = out.getContext('2d');
 
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, wPx, hPx);
+  // White background only when NOT transparent and no bg image
+  const hasBg = imgState.loaded && imgState.visible;
+  if (!transparent && !hasBg) {
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, wPx, hPx);
+  }
 
-  if (imgState.loaded && imgState.visible) {
-    // Map the on-screen image transform (viewport-relative) to export resolution
+  if (hasBg) {
+    if (!transparent) { ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, wPx, hPx); }
     const scaleRatio = wPx / innerWidth;
     const drawW = imgState.naturalW * imgState.scale * scaleRatio;
     const drawH = imgState.naturalH * imgState.scale * scaleRatio;
@@ -934,7 +950,7 @@ function renderOffscreen(wPx, hPx) {
     ctx.drawImage(bgImg, cx - drawW / 2, cy - drawH / 2, drawW, drawH);
   }
 
-  ctx.globalAlpha = imgState.loaded ? (1 - imgState.opacity) : 1;
+  ctx.globalAlpha = hasBg ? (1 - imgState.opacity) : 1;
   ctx.drawImage(gridCanvas, 0, 0, wPx, hPx);
   ctx.globalAlpha = 1;
 
@@ -942,55 +958,161 @@ function renderOffscreen(wPx, hPx) {
   return out;
 }
 
-function doExport(format) {
-  const unit = $('exp-unit').value;
-  const dpi  = +$('exp-dpi').value || 300;
-  const wRaw = +$('exp-w').value   || 3508;
-  const hRaw = +$('exp-h').value   || 2480;
-  const wPx  = unitToPx(wRaw, unit, dpi);
-  const hPx  = unitToPx(hRaw, unit, dpi);
+// ── 360° equirectangular export ───────────────────────────────────────────────
+function export360(wPx) {
+  const hPx = wPx / 2; // 2:1 equirectangular
+  const faceSize = Math.min(wPx / 4, 2048);
 
-  if (format === 'svg') {
-    exportSVG(wPx, hPx, wRaw, hRaw, unit, dpi);
-    return;
+  // Render 6 cube faces
+  const cubeRenderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, alpha: true });
+  cubeRenderer.setPixelRatio(1);
+  cubeRenderer.setSize(faceSize, faceSize);
+  cubeRenderer.setClearColor(0xffffff, 0);
+
+  const cubeCam = new THREE.PerspectiveCamera(90, 1, 0.05, 8000);
+  cubeCam.position.copy(camera.position);
+
+  // face: [lookAt target offset, up vector]
+  const faces = [
+    { dir: new THREE.Vector3( 1, 0, 0), up: new THREE.Vector3(0,-1, 0) }, // +X right
+    { dir: new THREE.Vector3(-1, 0, 0), up: new THREE.Vector3(0,-1, 0) }, // -X left
+    { dir: new THREE.Vector3( 0, 1, 0), up: new THREE.Vector3(0, 0, 1) }, // +Y up
+    { dir: new THREE.Vector3( 0,-1, 0), up: new THREE.Vector3(0, 0,-1) }, // -Y down
+    { dir: new THREE.Vector3( 0, 0,-1), up: new THREE.Vector3(0,-1, 0) }, // -Z front
+    { dir: new THREE.Vector3( 0, 0, 1), up: new THREE.Vector3(0,-1, 0) }, // +Z back
+  ];
+
+  // Capture all 6 faces as ImageData
+  const faceCanvases = faces.map(f => {
+    cubeCam.up.copy(f.up);
+    cubeCam.lookAt(cubeCam.position.clone().add(f.dir));
+    cubeCam.updateMatrixWorld();
+    cubeRenderer.render(scene, cubeCam);
+
+    const fc = document.createElement('canvas');
+    fc.width = fc.height = faceSize;
+    fc.getContext('2d').drawImage(cubeRenderer.domElement, 0, 0);
+    return fc;
+  });
+  cubeRenderer.dispose();
+
+  // Stitch into equirectangular via canvas pixel sampling
+  const out = document.createElement('canvas');
+  out.width = wPx; out.height = hPx;
+  const ctx = out.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, wPx, hPx);
+
+  // Get pixel data from each face
+  const faceData = faceCanvases.map(fc => {
+    return fc.getContext('2d').getImageData(0, 0, faceSize, faceSize);
+  });
+
+  const outData = ctx.createImageData(wPx, hPx);
+  const px = outData.data;
+
+  for (let y = 0; y < hPx; y++) {
+    for (let x = 0; x < wPx; x++) {
+      // UV to spherical
+      const u = x / wPx;       // 0..1
+      const v = y / hPx;       // 0..1
+      const phi   = u * 2 * Math.PI - Math.PI; // -PI..PI  (azimuth)
+      const theta = v * Math.PI - Math.PI / 2; // -PI/2..PI/2 (elevation)
+
+      // Spherical to 3D direction
+      const dx =  Math.cos(theta) * Math.sin(phi);
+      const dy =  Math.sin(theta);
+      const dz = -Math.cos(theta) * Math.cos(phi);
+
+      // Find dominant face
+      const ax = Math.abs(dx), ay = Math.abs(dy), az = Math.abs(dz);
+      let face, fu, fv;
+
+      if (ax >= ay && ax >= az) {
+        if (dx > 0) { face = 0; fu = -dz/dx; fv = -dy/dx; }   // +X
+        else        { face = 1; fu =  dz/dx; fv = -dy/dx; }    // -X (note: dx negative)
+      } else if (ay >= ax && ay >= az) {
+        if (dy > 0) { face = 2; fu =  dx/dy; fv =  dz/dy; }   // +Y
+        else        { face = 3; fu =  dx/dy; fv = -dz/dy; }    // -Y
+      } else {
+        if (dz < 0) { face = 4; fu =  dx/dz; fv = -dy/dz; }   // -Z front
+        else        { face = 5; fu = -dx/dz; fv = -dy/dz; }    // +Z back
+      }
+
+      // Map face UV [-1,1] to pixel [0, faceSize)
+      const sx = Math.min(faceSize - 1, Math.max(0, Math.round((fu * 0.5 + 0.5) * faceSize)));
+      const sy = Math.min(faceSize - 1, Math.max(0, Math.round((fv * 0.5 + 0.5) * faceSize)));
+      const si = (sy * faceSize + sx) * 4;
+      const di = (y  * wPx    + x)  * 4;
+
+      px[di]   = faceData[face].data[si];
+      px[di+1] = faceData[face].data[si+1];
+      px[di+2] = faceData[face].data[si+2];
+      px[di+3] = 255;
+    }
   }
 
-  const canvas = renderOffscreen(wPx, hPx);
-  const mime   = format === 'jpg' ? 'image/jpeg' : 'image/png';
-  const ext    = format === 'jpg' ? 'jpg' : 'png';
-  const url    = canvas.toDataURL(mime, 0.95);
-  const a      = document.createElement('a');
-  a.href       = url;
-  a.download   = `grid_${wPx}x${hPx}.${ext}`;
+  ctx.putImageData(outData, 0, 0);
+
+  // Download
+  const url = out.toDataURL('image/png');
+  const a   = document.createElement('a');
+  a.href    = url;
+  a.download = `grid_360_${wPx}x${hPx}.png`;
   a.click();
 }
 
-function exportSVG(wPx, hPx, wRaw, hRaw, unit, dpi) {
-  // Render to canvas then embed as image in SVG with correct physical dimensions
-  const canvas = renderOffscreen(wPx, hPx);
+function exportSVG(wPx, hPx, wRaw, hRaw, unit) {
+  const canvas  = renderOffscreen(wPx, hPx, false);
   const imgData = canvas.toDataURL('image/png');
-
   const svgW = unit === 'px' ? wPx + 'px' : (wRaw + unit);
   const svgH = unit === 'px' ? hPx + 'px' : (hRaw + unit);
   const svg = `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg"
-     xmlns:xlink="http://www.w3.org/1999/xlink"
-     width="${svgW}" height="${svgH}"
-     viewBox="0 0 ${wPx} ${hPx}">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+     width="${svgW}" height="${svgH}" viewBox="0 0 ${wPx} ${hPx}">
   <image xlink:href="${imgData}" x="0" y="0" width="${wPx}" height="${hPx}"/>
 </svg>`;
   const blob = new Blob([svg], { type: 'image/svg+xml' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
-  a.href     = url;
-  a.download = `grid_${wPx}x${hPx}.svg`;
-  a.click();
+  a.href = url; a.download = `grid_${wPx}x${hPx}.svg`; a.click();
   setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+function doExport(format) {
+  const unit        = $('exp-unit').value;
+  const dpi         = +$('exp-dpi').value || 300;
+  const wRaw        = +$('exp-w').value   || 3508;
+  const hRaw        = +$('exp-h').value   || 2480;
+  const wPx         = unitToPx(wRaw, unit, dpi);
+  const hPx         = unitToPx(hRaw, unit, dpi);
+  const transparent = $('exp-transparent').checked && format === 'png';
+
+  if (format === 'svg') { exportSVG(wPx, hPx, wRaw, hRaw, unit, dpi); return; }
+
+  const canvas = renderOffscreen(wPx, hPx, transparent);
+  const mime   = format === 'jpg' ? 'image/jpeg' : 'image/png';
+  const ext    = format === 'jpg' ? 'jpg' : 'png';
+  const url    = canvas.toDataURL(mime, 0.95);
+  const a      = document.createElement('a');
+  a.href = url; a.download = `grid_${wPx}x${hPx}.${ext}`; a.click();
 }
 
 $('exp-png').addEventListener('click', () => doExport('png'));
 $('exp-jpg').addEventListener('click', () => doExport('jpg'));
 $('exp-svg').addEventListener('click', () => doExport('svg'));
+$('exp-360').addEventListener('click', () => {
+  const w = Math.max(512, Math.min(16384, +$('exp360-w').value || 4096));
+  const btn = $('exp-360');
+  btn.textContent = 'Rendering…';
+  btn.disabled = true;
+  setTimeout(() => {
+    try { export360(w); } finally {
+      btn.textContent = 'Export 360° PNG';
+      btn.disabled = false;
+    }
+  }, 50);
+});
 </script>
 </body>
 </html>
